@@ -42,22 +42,49 @@ export const postService = {
       where += ` AND author_id = $${i++}`;
       values.push(params.authorId);
     }
+
+    const offset = (params.page - 1) * params.limit;
+    // count
+    let countSql = `SELECT COUNT(*)::int AS total FROM posts WHERE tenant_id = $1${where}`;
+    let countValues = [...values];
+
+    // data query
+    let dataSql = "";
+    let dataValues: any[] = [];
+
     if (params.q) {
-      where += ` AND title ILIKE $${i++}`;
+      where += ` AND search_tsv @@ websearch_to_tsquery('english',$${i++})`;
       values.push(params.q);
+
+      countSql = `SELECT COUNT(*)::int AS total FROM posts WHERE tenant_id=$1${where}`;
+      countValues = [...values];
+
+      //data
+      dataSql = `
+      SELECT id, tenant_id, author_id, title, slug, status, published_at, created_at, updated_at
+      ts_rank(search_tsv, websearch_to_tsquery('english',$${i - 1})) AS rank
+      FROM posts
+      WHERE tenant_id = $1${where}
+      ORDER BY rank DESC, crated_at DESC
+      LIMIT $${i++} OFFSET $${i++}
+      `;
+      dataValues = [...values, params.limit, offset];
+    }else{
+
+      //normal listing no FTS
+       const orderBy = params.sort === "oldest" ? "created_at ASC" : "created_at DESC";
+    dataSql = `
+      SELECT id, tenant_id, author_id, title, slug, status, published_at, created_at, updated_at
+      FROM posts
+      WHERE tenant_id = $1${where}
+      ORDER BY ${orderBy}
+      LIMIT $${i++} OFFSET $${i++}
+    `;
+    dataValues = [...values, params.limit, offset];
     }
 
-    const orderBy =
-      params.sort === "oldest" ? "created_at ASC" : "created_at DESC";
-    const offset = (params.page - 1) * params.limit;
-
-    const countSql = `SELECT COUNT(*)::int AS total FROM posts WHERE tenant_id=$1${where}`;
-    const countRes = await pool.query(countSql, values);
-    const total = countRes.rows[0]?.total ?? 0;
-
-    //data
-    const dataSql = `${postsSql.listBase}${where} ORDER BY ${orderBy} LIMIT $${i++} OFFSET $${i++}`;
-    const dataValues = [...values, params.limit, offset];
+    const countRes = await pool.query(countSql,countValues);
+    const total = countRes.rows[0]?.total??0;
 
     const dataRes = await pool.query(dataSql, dataValues);
 

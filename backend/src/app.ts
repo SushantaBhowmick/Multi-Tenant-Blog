@@ -14,6 +14,7 @@ import { authRoutes } from "./modules/auth/auth.routes.js";
 import { tenantsRoutes } from "./modules/tenants/tenants.routes.js";
 import { postRoutes } from "./modules/posts/post.routes.js";
 import { commentsRoutes } from "./modules/comments/comments.routes.js";
+import { tagsRoutes } from "./modules/tags/tags.routes.js";
 
 export function createApp() {
   const app = express();
@@ -52,6 +53,7 @@ export function createApp() {
   app.use("/api/tenants", tenantsRoutes);
   app.use("/api/posts", postRoutes);
   app.use("/api/comments", commentsRoutes);
+  app.use("/api/tags", tagsRoutes);
 
   app.use(notFound);
   app.use(errorHandler);
